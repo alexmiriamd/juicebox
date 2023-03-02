@@ -67,7 +67,9 @@ async function getUserById(userId) {
     }
 }
 
+
 //posts
+
 
 async function getAllPosts(){
     try{
@@ -89,9 +91,9 @@ async function createPost({
 }) {
     try{
         const {rows: [post]}= await client.query(`
-        INSERT INTO posts ("authorId", title, content) 
-        VALUES ($1, $2, $3)
-        RETURNING *;
+            INSERT INTO posts ("authorId", title, content) 
+            VALUES ($1, $2, $3)
+            RETURNING *;
         `, [authorId, title, content]);
 
         return post;
@@ -111,10 +113,10 @@ async function updatePost(id, fields = {}) {
 
     try {
         const { rows: [ post ] } = await client.query(`
-        UPDATE posts
-        SET ${ setString }
-        WHERE id=${ id }
-        RETURNING *;
+            UPDATE posts
+            SET ${ setString }
+            WHERE id=${ id }
+            RETURNING *;
         `, Object.values(fields));
 
         return post;
@@ -138,6 +140,36 @@ async function getPostsByUser(userId) {
 }
 
 
+//tags
+
+async function createTags(tagList){
+    if(tagList.length === 0) {
+        return;
+    }
+
+    const insertValues = tagList.map(
+        (_, index) => `$${index + 1}`).join('), (');
+            // $1), ($2), ($3 
+    const selectValues = tagList.map(
+        (_, index) => `$${index + 1}`).join(', ');
+            // $1, $2, $3 
+    try{
+        const result = await client.query(`
+            INSERT INTO tags(name)
+            VALUES (${ insertValues })
+            ON CONFLICT (name) DO NOTHING;
+        `)
+        const { rows } = await client.query(`
+            SELECT * FROM tags
+            WHERE name
+            IN (${ selectValues });
+        `)
+        
+        return rows
+    } catch (error){
+        throw error
+    }
+}
 
 module.exports ={
     client,
@@ -147,5 +179,6 @@ module.exports ={
     createPost,
     getAllPosts,
     updatePost,
-    getUserById
+    getUserById,
+    createTags
 }
