@@ -78,11 +78,9 @@ async function getAllPosts(){
             `SELECT *
             FROM posts;
         `);
-        console.log(postIds, "!!!!!")
         const posts = await Promise.all(postIds.map(
             post => getPostById( post.id )
         ));
-    console.log(posts, "testtest")  
         return posts;
     } catch (error) {
         throw error;
@@ -124,40 +122,30 @@ async function updatePost(postId, fields = {}) {
             await client.query(`
             UPDATE posts
             SET ${ setString }
-            WHERE id=${ id }
+            WHERE id=${ postId }
             RETURNING *;
-        `, Object.values(fields));
+            `, Object.values(fields));
+        }
 
-    }
+        if (tags === undefined) {
+            return await getPostById(postId);
+        }
 
-    if (setString.length > 0) {
+        const tagList = await createTags(tags);
+        const tagListIdString = tagList.map(
+            tag => `${ tag.id }`
+        ).join(', ');
+
         await client.query(`
-        UPDATE posts
-        SET ${ setString }
-        WHERE id=${ postId }
-        RETURNING *;
-        `, Object.values(fields));
-    }
+        DELETE FROM post_tags
+        WHERE "tagId"
+        NOT IN (${ tagListIdString })
+        AND "postId"=$1;
+        `, [postId]);
 
-    if (tags === undefined) {
+        await addTagsToPost(postId, tagList);
+
         return await getPostById(postId);
-    }
-
-    const tagList = await createTags(tags);
-    const tagListIdString = tagList.map(
-        tag => `${ tag.id }`
-    ).join(', ');
-
-    await client.query(`
-    DELETE FROM post_tags
-    WHERE "tagId"
-    NOT IN (${ tagListIdString })
-    AND "postId"=$1;
-    `, [postId]);
-
-    await addTagsToPost(postId, tagList);
-
-    return await getPostById(postId);
     } catch (error) {
         throw error;
     }
@@ -238,7 +226,7 @@ async function createTags(tagList){
             WHERE name
             IN (${ selectValues });
         `, tagList)
-        console.log(rows, "this is rows");
+        
         return rows
     } catch (error){
         throw error
